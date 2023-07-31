@@ -46,10 +46,10 @@ namespace Resonance
             }
 
             BasicKeplerianNormal normal;
-            switch (count)
+            switch (PlanetsCount)
             {
                 case 0:
-                    normal = new(new(Constants.AU, 0, 0), new(Constants.AU / 2, 1, Math.PI / 2));
+                    normal = new(new(Constants.AU, 0, 0), new(Constants.AU / 2, 0.1, Math.PI / 2));
                     break;
                 case 1:
                     BasicKeplerian planet = Planets[0].ToBasicKeplerian(MainStar);
@@ -185,10 +185,14 @@ namespace Resonance
         }
 
         public abstract void Run(int steps, double dt, int substeps);
+
+        public abstract void ExportVideoframes(string directory, int width, int height, int xIndex, int yIndex, double percentile);
     }
 
     public class KeplerianSimulation : Simulation
     {
+        BasicKeplerianData? Data;
+
         public KeplerianSimulation(Star mainStar, int particlesCount = 0) : base(mainStar, particlesCount) { }
 
         public KeplerianSimulation(Star mainStar, Planet planet, int particlesCount = 0) : base(mainStar, planet, particlesCount) { }
@@ -200,27 +204,40 @@ namespace Resonance
             Stopwatch timer = new();
             timer.Start();
 
+            Data = new(steps, PlanetsCount, ParticlesCount);
+            BasicKeplerian keplerian;
+
             for (int step = 0; step < steps; step++)
             {
-                for (int i = 0; i < substeps; i++)
+                for (int substep = 0; substep < substeps; substep++)
                     NextStep(dt);
 
-                for (int i = 0; i < PlanetsCount; i++)
+                for (int planetIndex = 0; planetIndex < PlanetsCount; planetIndex++)
                 {
-                    BasicKeplerian keplerian = Keplerian.BasicFromCartesian(MainStar.Mass, Planets[i].Pos - MainStar.Pos, Planets[i].Vel - MainStar.Vel);
+                    keplerian = BasicKeplerian.FromCartesian(MainStar.Mass, Planets[planetIndex].Pos - MainStar.Pos, Planets[planetIndex].Vel - MainStar.Vel);
+                    Data.AddPlanetDatapoint(step, planetIndex, keplerian);
                 }
-
-                for (int i = 0; i < ParticlesCount; i++)
+                
+                for (int particleIndex = 0; particleIndex < ParticlesCount; particleIndex++)
                 {
-                    BasicKeplerian keplerian = Keplerian.BasicFromCartesian(MainStar.Mass, Particles[i].Pos - MainStar.Pos, Particles[i].Vel - MainStar.Vel);
+                    keplerian = BasicKeplerian.FromCartesian(MainStar.Mass, Particles[particleIndex].Pos - MainStar.Pos, Particles[particleIndex].Vel - MainStar.Vel);
+                    Data.AddParticleDatapoint(step, particleIndex, keplerian);
                 }
 
                 double remainingSeconds = ((double)steps / (step + 1) - 1) * timer.ElapsedMilliseconds / 1000;
 
-                Console.Write($"\r{step + 1}/{steps}, " + Math.Round(remainingSeconds, 2).ToString() + " seconds remaining");
+                Console.Write($"\rSimulation: step {step + 1}/{steps}, " + Math.Round(remainingSeconds, 2).ToString() + " seconds remaining");
             }
               
-            Console.WriteLine($"\r{steps}/{steps}, finished in " + Math.Round((double)timer.ElapsedMilliseconds / 1000, 2).ToString() + " seconds");
+            Console.WriteLine($"\rSimulation: step {steps}/{steps}, finished in " + Math.Round((double)timer.ElapsedMilliseconds / 1000, 2).ToString() + " seconds");
+        }
+
+        public override void ExportVideoframes(string directory, int width = 1920, int height = 1080, int xAxis = 0, int yAxis = 1, double percentile = 5)
+        {
+            Console.Write($"\rWriting videoframes to '{directory}'...");
+            Videoframes frames = Data.ParticlesToVideoframes(width, height, xAxis, yAxis, percentile);
+            frames.SaveToPngs(directory);
+            Console.WriteLine($"\rWrote all videoframes to '{directory}'");
         }
     }
 }

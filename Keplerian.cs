@@ -21,6 +21,26 @@
         }
 
         public static BasicKeplerian Zero { get { return new(0.0, 0.0, 0.0); } }
+
+        public bool IsEscaping { get { return Eccentricity >= 1.0; } }
+
+        public static BasicKeplerian FromCartesian(double starMass, Vector3D pos, Vector3D vel)
+        {
+            double mu = Constants.G * starMass;
+            Vector3D angMomentum = Vector3D.Cross(pos, vel);
+
+            double eccentricity = (((vel.Magnitude * vel.Magnitude - mu / pos.Magnitude) * pos - Vector3D.Dot(pos, vel) * vel) / mu).Magnitude;
+
+            double semiMajorAxis;
+            if (Math.Abs(eccentricity - 1.0) > double.Epsilon)
+                semiMajorAxis = -mu / (vel.Magnitude * vel.Magnitude - 2 * mu / pos.Magnitude);
+            else
+                semiMajorAxis = double.PositiveInfinity;
+
+            double inclination = Math.Acos(angMomentum.z / angMomentum.Magnitude);
+
+            return new(semiMajorAxis, eccentricity, inclination);
+        }
     }
     
     public class BasicKeplerianNormal
@@ -62,16 +82,16 @@
         {
             double mu = Constants.G * StarMass;
 
-            double eccentricAnormaly = Math.Acos((Eccentricity + Math.Cos(TrueAnomaly)) / (1 + Eccentricity * Math.Cos(TrueAnomaly)));  // https://en.wikipedia.org/wiki/Eccentric_anomaly
-            double distance = SemiMajorAxis * (1 - Eccentricity * Math.Cos(eccentricAnormaly));
+            double eccentricAnomaly = Math.Atan(Math.Sqrt(1 - Eccentricity * Eccentricity) * Math.Sin(TrueAnomaly) / (Eccentricity + Math.Cos(TrueAnomaly)));
+            double distance = SemiMajorAxis * (1 - Eccentricity * Math.Cos(eccentricAnomaly));
 
             Vector3D oPos = distance * new Vector3D(Math.Cos(TrueAnomaly), Math.Sin(TrueAnomaly), 0);
-            Vector3D oVel = Math.Sqrt(mu * SemiMajorAxis) / distance * new Vector3D(-Math.Sin(eccentricAnormaly),
-                                                                                     Math.Sqrt(1 - Eccentricity * Eccentricity) * Math.Cos(eccentricAnormaly),
+            Vector3D oVel = Math.Sqrt(mu * SemiMajorAxis) / distance * new Vector3D(-Math.Sin(eccentricAnomaly),
+                                                                                     Math.Sqrt(1 - Eccentricity * Eccentricity) * Math.Cos(eccentricAnomaly),
                                                                                      0);
 
             Vector3D pos = new(oPos.x * (Math.Cos(ArgumentPeriapsis) * Math.Cos(LongitudeAscending) - Math.Sin(ArgumentPeriapsis) * Math.Cos(Inclination) * Math.Sin(LongitudeAscending)) - oPos.y * (Math.Sin(ArgumentPeriapsis) * Math.Cos(LongitudeAscending) + Math.Cos(ArgumentPeriapsis) * Math.Cos(Inclination) * Math.Sin(LongitudeAscending)),
-                               oPos.x * (Math.Cos(ArgumentPeriapsis) * Math.Sin(LongitudeAscending) + Math.Sin(ArgumentPeriapsis) * Math.Cos(Inclination) * Math.Cos(LongitudeAscending)) + oPos.y * (Math.Cos(ArgumentPeriapsis) * Math.Cos(Inclination) * Math.Cos(LongitudeAscending) - Math.Cos(ArgumentPeriapsis) * Math.Sin(LongitudeAscending)),
+                               oPos.x * (Math.Cos(ArgumentPeriapsis) * Math.Sin(LongitudeAscending) + Math.Sin(ArgumentPeriapsis) * Math.Cos(Inclination) * Math.Cos(LongitudeAscending)) + oPos.y * (Math.Cos(ArgumentPeriapsis) * Math.Cos(Inclination) * Math.Cos(LongitudeAscending) - Math.Sin(ArgumentPeriapsis) * Math.Sin(LongitudeAscending)),
                                oPos.x * Math.Sin(ArgumentPeriapsis) * Math.Sin(Inclination) + oPos.y * Math.Cos(ArgumentPeriapsis) * Math.Sin(Inclination));
             Vector3D vel = new(oVel.x * (Math.Cos(ArgumentPeriapsis) * Math.Cos(LongitudeAscending) - Math.Sin(ArgumentPeriapsis) * Math.Cos(Inclination) * Math.Sin(LongitudeAscending)) - oVel.y * (Math.Sin(ArgumentPeriapsis) * Math.Cos(LongitudeAscending) + Math.Cos(ArgumentPeriapsis) * Math.Cos(Inclination) * Math.Sin(LongitudeAscending)),
                                oVel.x * (Math.Cos(ArgumentPeriapsis) * Math.Sin(LongitudeAscending) + Math.Sin(ArgumentPeriapsis) * Math.Cos(Inclination) * Math.Cos(LongitudeAscending)) + oVel.y * (Math.Cos(ArgumentPeriapsis) * Math.Cos(Inclination) * Math.Cos(LongitudeAscending) - Math.Sin(ArgumentPeriapsis) * Math.Sin(LongitudeAscending)),
@@ -80,7 +100,7 @@
             return new(pos, vel);
         }
 
-        public static Keplerian FromCartesian(double starMass, Vector3D pos, Vector3D vel)
+        public new static Keplerian FromCartesian(double starMass, Vector3D pos, Vector3D vel)
         {
             double mu = Constants.G * starMass;
             Vector3D angMomentum = Vector3D.Cross(pos, vel);
@@ -116,24 +136,6 @@
             return new(starMass, semiMajorAxis, eccentricity, inclination, longitudeAscending, argumentPeriapsis, trueAnormaly);
         }
 
-        public static BasicKeplerian BasicFromCartesian(double starMass, Vector3D pos, Vector3D vel)
-        {
-            double mu = Constants.G * starMass;
-            Vector3D angMomentum = Vector3D.Cross(pos, vel);
-
-            double eccentricity = (((vel.Magnitude * vel.Magnitude - mu / pos.Magnitude) * pos - Vector3D.Dot(pos, vel) * vel) / mu).Magnitude;
-
-            double semiMajorAxis;
-            if (Math.Abs(eccentricity - 1.0) > double.Epsilon)
-                semiMajorAxis = -mu / (vel.Magnitude * vel.Magnitude - 2 * mu / pos.Magnitude);
-            else
-                semiMajorAxis = double.PositiveInfinity;
-
-            double inclination = Math.Acos(angMomentum.z / angMomentum.Magnitude);
-
-            return new(semiMajorAxis, eccentricity, inclination);
-        }
-
-        public new static Keplerian Zero(double starMass) { return new(starMass, 0, 0, 0, 0, 0, 0); }
+        public new static Keplerian Zero(double starMass) { return new(starMass, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0); }
     }
 }
